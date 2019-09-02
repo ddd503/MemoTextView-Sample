@@ -26,12 +26,20 @@ import UIKit
         }
     }
 
-    // MARK: - LifeCycle
+    // MARK: - override
 
     /// xibのロード後に呼ばれる
     override func awakeFromNib() {
         super.awakeFromNib()
         setup()
+    }
+
+    /// キャレットの高さ調整
+    override func caretRect(for position: UITextPosition) -> CGRect {
+        var superRect = super.caretRect(for: position)
+        guard let font = self.font else { return superRect }
+        superRect.size.height = font.pointSize - font.descender
+        return superRect
     }
 
     // MARK: - Private
