@@ -38,6 +38,7 @@ import UIKit
     override func caretRect(for position: UITextPosition) -> CGRect {
         var superRect = super.caretRect(for: position)
         guard let font = self.font else { return superRect }
+        // キャレットの高さをフォントに合わせる
         superRect.size.height = font.pointSize - font.descender
         return superRect
     }
@@ -140,6 +141,14 @@ import UIKit
     @objc func endEditing(sender: UIButton) {
         endEditing(true)
     }
+
+    private func scrollSelectTextPosition() {
+        guard let selectedTextRange = selectedTextRange else { return }
+        var caret = caretRect(for: selectedTextRange.end)
+        // inset分caretがどの高さにくるか調整
+        caret.origin.y += textContainerInset.bottom
+        scrollRectToVisible(caret, animated: false)
+    }
 }
 
 // MARK: - UITextViewDelegate
@@ -147,12 +156,18 @@ import UIKit
 extension MemoTextView: UITextViewDelegate {
     func textViewDidChange(_ textView: UITextView) {
         isHiddenPlaceHolderIfNeeded()
+        scrollSelectTextPosition()
         guard let keyboardFrame = keyboardFrame, let duration = keyboardAnimationDuration else { return }
         transformIfNeeded(keyboardFrame: keyboardFrame, duration: duration)
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
         textView.makeSepalateLinesFont(firstLineFont: boldFont, otherLinesFont: normalFont)
+    }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+        // コピペ動作をキャッチ
+        scrollSelectTextPosition()
     }
 }
 
