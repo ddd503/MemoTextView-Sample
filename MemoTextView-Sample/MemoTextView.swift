@@ -15,8 +15,8 @@ import UIKit
     private lazy var placeHolderLabel = UILabel(frame: CGRect(x: 15, y: 15, width: 0, height: 0))
     private var keyboardFrame: CGRect?
     private var keyboardAnimationDuration: TimeInterval?
-    private let normalFont = UIFont(name: "HiraginoSans-W3", size: 17)!
-    private let boldFont = UIFont(name: "HiraginoSans-W6", size: 17)!
+    private let normalFont = UIFont.systemFont(ofSize: 17)
+    private let boldFont = UIFont.boldSystemFont(ofSize: 17)
 
     // placeHolderの内容は、Storyboardから編集できるようにする
     @IBInspectable var placeHolderText: String = "" {
@@ -32,15 +32,6 @@ import UIKit
     override func awakeFromNib() {
         super.awakeFromNib()
         setup()
-    }
-
-    /// キャレットの高さ調整
-    override func caretRect(for position: UITextPosition) -> CGRect {
-        var superRect = super.caretRect(for: position)
-        guard let font = self.font else { return superRect }
-        // キャレットの高さをフォントに合わせる
-        superRect.size.height = font.pointSize - font.descender
-        return superRect
     }
 
     // MARK: - Private
@@ -117,6 +108,7 @@ import UIKit
     /// - Parameter size: キーボードのサイズ
     /// - Returns: Bool
     func isOverKeyboardSize(_ size: CGSize) -> Bool {
+        // FIXME: - ここの判定が間違っている（テキストの最後が隠れる）隠れる
         let overLimit = UIScreen.main.bounds.height - size.height
         let currentHeight = (UIScreen.main.bounds.height - frame.height) + contentSize.height
         return currentHeight > overLimit
