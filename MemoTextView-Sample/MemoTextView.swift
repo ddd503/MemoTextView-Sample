@@ -84,12 +84,14 @@ import UIKit
     ///   - keyboardFrame: キーボードのFrame
     ///   - duration: キーボードの表示アニメーションのduration
     private func transformIfNeeded(keyboardFrame: CGRect, duration: TimeInterval) {
-        guard isOverKeyboardSize(keyboardFrame.size), transform.isIdentity else { return }
-        // 押し上げ分、コンテンツは下げる(スクロール幅を広げる)
-        contentInset.top += keyboardFrame.height
-        UIView.animate(withDuration: duration, animations: { [weak self] in
-            self?.transform = CGAffineTransform(translationX: 0, y: -keyboardFrame.height)
-        })
+        isOverKeyboardSize(keyboardFrame.size) { [weak self] (isOver, overLength) in
+            guard let self = self, self.transform.isIdentity, isOver else { return }
+            // 押し上げ分、コンテンツは下げる(スクロール幅を広げる)
+            self.contentInset.top += overLength
+            UIView.animate(withDuration: duration, animations: {
+                self.transform = CGAffineTransform(translationX: 0, y: -overLength)
+            })
+        }
     }
 
     /// キーボード分の高さテキスト領域を上にずらした状態から元の状態に戻す
@@ -103,15 +105,17 @@ import UIKit
         })
     }
 
-    /// キーボードが出た時にテキストが隠れてしまうかどうか
+    /// キーボードが出た時にテキストが隠れるかどうか
     ///
     /// - Parameter size: キーボードのサイズ
     /// - Returns: Bool
-    func isOverKeyboardSize(_ size: CGSize) -> Bool {
-        // FIXME: - ここの判定が間違っている（テキストの最後が隠れる）隠れる
+    func isOverKeyboardSize(_ size: CGSize, completion: @escaping (_ isOver: Bool, _ overLength: CGFloat) -> ()) {
         let overLimit = UIScreen.main.bounds.height - size.height
-        let currentHeight = (UIScreen.main.bounds.height - frame.height) + contentSize.height
-        return currentHeight > overLimit
+        currentCaretBottomY { (float) in
+            let isOver = float > overLimit
+            let overLength = float - overLimit
+            completion(isOver, overLength)
+        }
     }
 
     /// キーボード上に閉じるボタンを追加する
@@ -122,11 +126,14 @@ import UIKit
         let buttonHeight = backgroundView.frame.height
         let closeButton = UIButton(frame: CGRect(x: backgroundView.frame.width - buttonWidth, y: 0,
                                                  width: buttonWidth, height: buttonHeight))
+        closeButton.backgroundColor = .white
         closeButton.setTitle("閉じる", for: .normal)
         closeButton.titleLabel?.font = font
         closeButton.setTitleColor(.darkGray, for: .normal)
         closeButton.addTarget(self, action: #selector(endEditing(sender:)), for: .touchUpInside)
         backgroundView.addSubview(closeButton)
+        closeButton.layer.masksToBounds = true
+        closeButton.layer.cornerRadius = 10
         inputAccessoryView = backgroundView
     }
 
@@ -189,5 +196,25 @@ private extension UITextView {
         }
 
         attributedText = mutableAttributedString
+    }
+
+    /// caretのbottomのY座標を取得する
+    ///
+    /// textViewDidBeginEditingで呼び出す
+    func currentCaretBottomY(completion: @escaping (CGFloat) -> ()) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.async { [weak self] in
+                guard let weakSelf = self else {
+                    return
+                }
+                guard let selectedRange = weakSelf.selectedTextRange else {
+                    return
+                }
+                let caretRect = weakSelf.caretRect(for: selectedRange.start)
+                let caretRectInWindow = weakSelf.convert(caretRect, to: nil)
+                let caretBottomY = caretRectInWindow.origin.y + caretRectInWindow.size.height
+                completion(caretBottomY)
+            }
+        }
     }
 }
