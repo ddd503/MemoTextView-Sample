@@ -78,43 +78,46 @@ import UIKit
         deformIfNeeded(duration: duration)
     }
 
-    /// キーボード分の高さ、テキスト領域を上にずらす
+    /// 必要に応じて、テキスト領域を上にずらす
     ///
     /// - Parameters:
     ///   - keyboardFrame: キーボードのFrame
     ///   - duration: キーボードの表示アニメーションのduration
     private func transformIfNeeded(keyboardFrame: CGRect, duration: TimeInterval) {
-        isOverKeyboardSize(keyboardFrame.size) { [weak self] (isOver, overLength) in
-            guard let self = self, self.transform.isIdentity, isOver else { return }
+        isHiddenSelectPosition(keyboardSize: keyboardFrame.size) { [weak self] (isHedden, hiddenLength) in
+            guard let self = self, self.transform.isIdentity, isHedden else { return }
             // 押し上げ分、コンテンツは下げる(スクロール幅を広げる)
-            self.contentInset.top += overLength
+            self.contentInset.top += hiddenLength
+            self.scrollIndicatorInsets.top += hiddenLength
             UIView.animate(withDuration: duration, animations: {
-                self.transform = CGAffineTransform(translationX: 0, y: -overLength)
+                self.transform = CGAffineTransform(translationX: 0, y: -hiddenLength)
             })
         }
     }
 
-    /// キーボード分の高さテキスト領域を上にずらした状態から元の状態に戻す
+    /// テキスト領域を上にずらした状態から元の状態に戻す
     ///
     /// - Parameter duration: キーボードの表示アニメーションのduration
     private func deformIfNeeded(duration: TimeInterval) {
         guard !self.transform.isIdentity else { return }
         contentInset.top = 0
+        scrollIndicatorInsets.top = 0
         UIView.animate(withDuration: duration, animations: { [weak self] in
             self?.transform = .identity
         })
     }
 
-    /// キーボードが出た時にテキストが隠れるかどうか
+    /// キーボードが出た時にタップ位置が隠れるかどうか
     ///
-    /// - Parameter size: キーボードのサイズ
-    /// - Returns: Bool
-    func isOverKeyboardSize(_ size: CGSize, completion: @escaping (_ isOver: Bool, _ overLength: CGFloat) -> ()) {
-        let overLimit = UIScreen.main.bounds.height - size.height
+    /// - Parameters:
+    ///   - keyboardSize: キーボードのサイズ
+    ///   - completion: 隠れるかどうか & 隠れた部分の長さ
+    func isHiddenSelectPosition(keyboardSize: CGSize, completion: @escaping (_ isHedden: Bool, _ hiddenLength: CGFloat) -> ()) {
+        let limit = UIScreen.main.bounds.height - keyboardSize.height
         currentCaretBottomY { (float) in
-            let isOver = float > overLimit
-            let overLength = float - overLimit
-            completion(isOver, overLength)
+            let isHedden = float > limit
+            let hiddenLength = float - limit
+            completion(isHedden, hiddenLength)
         }
     }
 
@@ -204,14 +207,9 @@ private extension UITextView {
     func currentCaretBottomY(completion: @escaping (CGFloat) -> ()) {
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
             DispatchQueue.main.async { [weak self] in
-                guard let weakSelf = self else {
-                    return
-                }
-                guard let selectedRange = weakSelf.selectedTextRange else {
-                    return
-                }
-                let caretRect = weakSelf.caretRect(for: selectedRange.start)
-                let caretRectInWindow = weakSelf.convert(caretRect, to: nil)
+                guard let self = self, let selectedRange = self.selectedTextRange else { return }
+                let caretRect = self.caretRect(for: selectedRange.start)
+                let caretRectInWindow = self.convert(caretRect, to: nil)
                 let caretBottomY = caretRectInWindow.origin.y + caretRectInWindow.size.height
                 completion(caretBottomY)
             }
