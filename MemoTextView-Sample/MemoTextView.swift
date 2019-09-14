@@ -84,50 +84,33 @@ import UIKit
     ///   - keyboardFrame: キーボードのFrame
     ///   - duration: キーボードの表示アニメーションのduration
     private func transformIfNeeded(keyboardFrame: CGRect, duration: TimeInterval) {
-        isHiddenSelectPosition(keyboardSize: keyboardFrame.size) { [weak self] (isHedden, hiddenLength) in
-            guard let self = self, self.transform.isIdentity, isHedden else { return }
-            // 押し上げ分、コンテンツは下げる(スクロール幅を広げる)
-            self.contentInset.top += hiddenLength
-            self.scrollIndicatorInsets.top += hiddenLength
-            UIView.animate(withDuration: duration, animations: {
-                self.transform = CGAffineTransform(translationX: 0, y: -hiddenLength)
-            })
-        }
+        UIView.animate(withDuration: duration, animations: { [weak self] in
+            guard let self = self else { return }
+            self.contentInset.bottom = keyboardFrame.height // keyboardで隠れるようならその分offsetYを調整してくれる
+            self.scrollIndicatorInsets.bottom = keyboardFrame.height
+            self.layoutIfNeeded()
+        })
     }
 
     /// テキスト領域を上にずらした状態から元の状態に戻す
     ///
     /// - Parameter duration: キーボードの表示アニメーションのduration
     private func deformIfNeeded(duration: TimeInterval) {
-        guard !self.transform.isIdentity else { return }
-        contentInset.top = 0
-        scrollIndicatorInsets.top = 0
         UIView.animate(withDuration: duration, animations: { [weak self] in
-            self?.transform = .identity
+            guard let self = self else { return }
+            self.contentInset.bottom = 0
+            self.scrollIndicatorInsets.bottom = 0
+            self.layoutIfNeeded()
         })
-    }
-
-    /// キーボードが出た時にタップ位置が隠れるかどうか
-    ///
-    /// - Parameters:
-    ///   - keyboardSize: キーボードのサイズ
-    ///   - completion: 隠れるかどうか & 隠れた部分の長さ
-    func isHiddenSelectPosition(keyboardSize: CGSize, completion: @escaping (_ isHedden: Bool, _ hiddenLength: CGFloat) -> ()) {
-        let limit = UIScreen.main.bounds.height - keyboardSize.height
-        currentCaretBottomY { (float) in
-            let isHedden = float > limit
-            let hiddenLength = float - limit
-            completion(isHedden, hiddenLength)
-        }
     }
 
     /// キーボード上に閉じるボタンを追加する
     func addCloseButtonOnKeyboard() {
         let backgroundView = UIView(frame: CGRect(x: 0, y: 0,
-                                                  width: UIScreen.main.bounds.width, height: 40))
-        let buttonWidth = UIScreen.main.bounds.width * 0.2
+                                                  width: UIScreen.main.bounds.width * 0.2, height: 40))
+        let buttonWidth = backgroundView.frame.width
         let buttonHeight = backgroundView.frame.height
-        let closeButton = UIButton(frame: CGRect(x: backgroundView.frame.width - buttonWidth, y: 0,
+        let closeButton = UIButton(frame: CGRect(x: UIScreen.main.bounds.width - buttonWidth, y: 0,
                                                  width: buttonWidth, height: buttonHeight))
         closeButton.backgroundColor = .white
         closeButton.setTitle("閉じる", for: .normal)
@@ -146,9 +129,7 @@ import UIKit
 
     private func scrollSelectTextPosition() {
         guard let selectedTextRange = selectedTextRange else { return }
-        var caret = caretRect(for: selectedTextRange.end)
-        // inset分caretがどの高さにくるか調整
-        caret.origin.y += textContainerInset.bottom
+        let caret = caretRect(for: selectedTextRange.end)
         scrollRectToVisible(caret, animated: false)
     }
 }
@@ -161,15 +142,16 @@ extension MemoTextView: UITextViewDelegate {
         scrollSelectTextPosition()
         guard let keyboardFrame = keyboardFrame, let duration = keyboardAnimationDuration else { return }
         transformIfNeeded(keyboardFrame: keyboardFrame, duration: duration)
+        scrollSelectTextPosition()
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
         textView.makeSepalateLinesFont(firstLineFont: boldFont, otherLinesFont: normalFont)
     }
 
-    func textViewDidChangeSelection(_ textView: UITextView) {
-        // コピペ動作をキャッチ
-        scrollSelectTextPosition()
+    func scrollViewDidScrollToTop(_ scrollView: UIScrollView) {
+        // コピペ量が多いと反映されていないケースへの対処
+        scrollView.layoutIfNeeded()
     }
 }
 
@@ -199,20 +181,5 @@ private extension UITextView {
         }
 
         attributedText = mutableAttributedString
-    }
-
-    /// caretのbottomのY座標を取得する
-    ///
-    /// textViewDidBeginEditingで呼び出す
-    func currentCaretBottomY(completion: @escaping (CGFloat) -> ()) {
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self, let selectedRange = self.selectedTextRange else { return }
-                let caretRect = self.caretRect(for: selectedRange.start)
-                let caretRectInWindow = self.convert(caretRect, to: nil)
-                let caretBottomY = caretRectInWindow.origin.y + caretRectInWindow.size.height
-                completion(caretBottomY)
-            }
-        }
     }
 }
