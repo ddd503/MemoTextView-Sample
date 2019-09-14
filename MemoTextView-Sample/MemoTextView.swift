@@ -67,7 +67,7 @@ import UIKit
             let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else { return }
         self.keyboardFrame = keyboardFrame
         self.keyboardAnimationDuration = duration
-        transformIfNeeded(keyboardFrame: keyboardFrame, duration: duration)
+        adjustInsetBottomWillShowKeyboard(keyboardFrame: keyboardFrame, duration: duration)
     }
 
     /// キーボードが閉じる際に走る通知
@@ -75,15 +75,15 @@ import UIKit
     /// - Parameter notification: キーボード情報
     @objc private func keyboardWillHide(notification: Notification) {
         guard let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else { return }
-        deformIfNeeded(duration: duration)
+        adjustInsetBottomWillHideKeyboard(duration: duration)
     }
 
-    /// 必要に応じて、テキスト領域を上にずらす
+    /// テキスト領域を上にずらす
     ///
     /// - Parameters:
     ///   - keyboardFrame: キーボードのFrame
     ///   - duration: キーボードの表示アニメーションのduration
-    private func transformIfNeeded(keyboardFrame: CGRect, duration: TimeInterval) {
+    private func adjustInsetBottomWillShowKeyboard(keyboardFrame: CGRect, duration: TimeInterval) {
         UIView.animate(withDuration: duration, animations: { [weak self] in
             guard let self = self else { return }
             self.contentInset.bottom = keyboardFrame.height // keyboardで隠れるようならその分offsetYを調整してくれる
@@ -95,7 +95,7 @@ import UIKit
     /// テキスト領域を上にずらした状態から元の状態に戻す
     ///
     /// - Parameter duration: キーボードの表示アニメーションのduration
-    private func deformIfNeeded(duration: TimeInterval) {
+    private func adjustInsetBottomWillHideKeyboard(duration: TimeInterval) {
         UIView.animate(withDuration: duration, animations: { [weak self] in
             guard let self = self else { return }
             self.contentInset.bottom = 0
@@ -141,7 +141,7 @@ extension MemoTextView: UITextViewDelegate {
         isHiddenPlaceHolderIfNeeded()
         scrollSelectTextPosition()
         guard let keyboardFrame = keyboardFrame, let duration = keyboardAnimationDuration else { return }
-        transformIfNeeded(keyboardFrame: keyboardFrame, duration: duration)
+        adjustInsetBottomWillShowKeyboard(keyboardFrame: keyboardFrame, duration: duration)
         scrollSelectTextPosition()
     }
 
